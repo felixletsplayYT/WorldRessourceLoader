@@ -6,12 +6,11 @@ import org.spongepowered.api.event.entity.MoveEntityEvent;
 import org.spongepowered.api.event.game.state.GameInitializationEvent;
 import org.spongepowered.api.event.network.ClientConnectionEvent;
 import org.spongepowered.api.plugin.Plugin;
-import org.spongepowered.common.resourcepack.SpongeURIResourcePack;
+import org.spongepowered.api.resourcepack.ResourcePack;
+import org.spongepowered.api.resourcepack.ResourcePacks;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileReader;
-import java.io.IOException;
+import java.io.*;
+import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -25,8 +24,9 @@ public class Main {
     @Listener
     public void pluginLoad(GameInitializationEvent event) {
         worlds = new HashMap<>();
+        resourcePacks = new HashMap<>();
         //Load config
-        File folder = new File("config" + File.pathSeparator + "worldResource");
+        File folder = new File("config" + File.separator + "worldResource");
         if (!folder.exists()) {
             folder.mkdirs();
         }
@@ -62,28 +62,33 @@ public class Main {
     @Listener
     public void onWorldChange(MoveEntityEvent.Teleport event){
         if (event.getTargetEntity() instanceof Player){
-            if (!worlds.get(event.getTargetEntity().getUniqueId().toString()).equals(event.getTargetEntity().getWorld().getUniqueId().toString())){
-                String worldID = event.getTargetEntity().getWorld().getUniqueId().toString();
+            if (!worlds.get(event.getTargetEntity().getUniqueId().toString()).equals(event.getToTransform().getExtent().getName())) {
+                String worldID = event.getToTransform().getExtent().getName();
                 worlds.put(event.getTargetEntity().getUniqueId().toString(), worldID);
-                if (resourcePacks.get(worldID) != null) {
-                    try {
-                        ((Player) event.getTargetEntity()).sendResourcePack(new SpongeURIResourcePack(resourcePacks.get(worldID)[0], resourcePacks.get(worldID)[1]));
-                    } catch (URISyntaxException e) {
-                        e.printStackTrace();
-                    }
-                }
+                sendResourcePack(worldID, (Player) event.getTargetEntity());
             }
         }
     }
 
+    private void sendResourcePack(String worldID, Player player) {
+        if (resourcePacks.get(worldID) != null) {
+            try {
+                ResourcePack pack = ResourcePacks.fromUri(new URI(resourcePacks.get(worldID)[1]));
+                player.sendResourcePack(pack);
+            } catch (URISyntaxException | FileNotFoundException e) {
+                e.printStackTrace();
+            }
+        }
+    }
     @Listener
     public void onPlayerJoined(ClientConnectionEvent.Join event) {
-        worlds.put(event.getTargetEntity().getUniqueId().toString(), event.getTargetEntity().getWorld().getUniqueId().toString());
+        worlds.put(event.getTargetEntity().getUniqueId().toString(), event.getTargetEntity().getWorld().getName());
+        sendResourcePack(event.getTargetEntity().getWorld().getName(), event.getTargetEntity());
     }
 
     @Listener
     public void onPlayerLeave(ClientConnectionEvent.Disconnect event) {
-        worlds.remove(event.getTargetEntity().getUniqueId().toString());
+        worlds.remove(event.getTargetEntity().getName());
     }
 
 }
